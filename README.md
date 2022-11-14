@@ -133,10 +133,14 @@ Usage of go-callvis:
     	Minimum edge length (for wider output). (default 2)
   -nodesep float
     	Minimum space between two adjacent nodes in the same rank (for taller output). (default 0.35)
+  -nodeps
+    	Omit dependencies packages
   -nointer
     	Omit calls to unexported functions.
   -nostd
     	Omit calls to/from packages in standard library.
+  -rootFunc string
+    	Root function in focus package
   -rankdir
         Direction of graph layout [LR | RL | TB | BT] (default "LR")
   -skipbrowser
