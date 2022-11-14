@@ -26,6 +26,7 @@ func printOutput(
 	mainPkg *ssa.Package,
 	cg *callgraph.Graph,
 	focusPkg *types.Package,
+	rootFunc string,
 	limitPaths,
 	ignorePaths,
 	includePaths []string,
@@ -140,7 +141,7 @@ func printOutput(
 	}
 
 	count := 0
-	err := callgraph.GraphVisitEdges(cg, func(edge *callgraph.Edge) error {
+	err := graphVisitEdges(cg, rootFunc, func(edge *callgraph.Edge) error {
 		count++
 
 		caller := edge.Caller
@@ -445,4 +446,33 @@ func printOutput(
 	}
 
 	return buf.Bytes(), nil
+}
+
+func graphVisitEdges(g *callgraph.Graph, rootFunc string, edge func(*callgraph.Edge) error) error {
+	seen := make(map[*callgraph.Node]bool)
+	var visit func(n *callgraph.Node) error
+	visit = func(n *callgraph.Node) error {
+		if !seen[n] {
+			seen[n] = true
+			for _, e := range n.Out {
+				if err := visit(e.Callee); err != nil {
+					return err
+				}
+				if err := edge(e); err != nil {
+					return err
+				}
+			}
+		}
+		return nil
+	}
+
+	for _, n := range g.Nodes {
+		if rootFunc != "" && n.Func.Name() != rootFunc {
+			continue
+		}
+		if err := visit(n); err != nil {
+			return err
+		}
+	}
+	return nil
 }

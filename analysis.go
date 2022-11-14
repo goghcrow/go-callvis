@@ -31,10 +31,11 @@ const (
 	CallGraphTypePointer               = "pointer"
 )
 
-//==[ type def/func: analysis   ]===============================================
+// ==[ type def/func: analysis   ]===============================================
 type renderOpts struct {
 	cacheDir string
 	focus    string
+	rootFunc string
 	group    []string
 	ignore   []string
 	include  []string
@@ -60,7 +61,7 @@ func mainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 	return mains, nil
 }
 
-//==[ type def/func: analysis   ]===============================================
+// ==[ type def/func: analysis   ]===============================================
 type analysis struct {
 	opts      *renderOpts
 	prog      *ssa.Program
@@ -75,6 +76,7 @@ func (a *analysis) DoAnalysis(
 	algo CallGraphType,
 	dir string,
 	tests bool,
+	noDeps bool,
 	args []string,
 ) error {
 	cfg := &packages.Config{
@@ -94,7 +96,15 @@ func (a *analysis) DoAnalysis(
 	}
 
 	// Create and build SSA-form program representation.
-	prog, pkgs := ssautil.AllPackages(initial, 0)
+	var prog *ssa.Program
+	var pkgs []*ssa.Package
+	if noDeps {
+		// for huge program
+		prog, pkgs = ssautil.Packages(initial, 0)
+	} else {
+		prog, pkgs = ssautil.AllPackages(initial, 0)
+	}
+
 	prog.Build()
 
 	var graph *callgraph.Graph
@@ -148,6 +158,7 @@ func (a *analysis) OptsSetup() {
 	a.opts = &renderOpts{
 		cacheDir: *cacheDir,
 		focus:    *focusFlag,
+		rootFunc: *rootFuncFlag,
 		group:    []string{*groupFlag},
 		ignore:   []string{*ignoreFlag},
 		include:  []string{*includeFlag},
@@ -209,6 +220,9 @@ func (a *analysis) OverrideByHTTP(r *http.Request) {
 		a.opts.focus = ""
 	} else if f != "" {
 		a.opts.focus = f
+	}
+	if rootFunc := r.FormValue("rootFunc"); rootFunc != "" {
+		a.opts.rootFunc = rootFunc
 	}
 	if std := r.FormValue("std"); std != "" {
 		a.opts.nostd = false
@@ -277,6 +291,7 @@ func (a *analysis) Render() ([]byte, error) {
 		a.mainPkg,
 		a.callgraph,
 		focusPkg,
+		a.opts.rootFunc,
 		a.opts.limit,
 		a.opts.ignore,
 		a.opts.include,
