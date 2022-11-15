@@ -48,6 +48,7 @@ var (
 		CallGraphTypeStatic, CallGraphTypeCha, CallGraphTypeRta, CallGraphTypePointer))
 
 	noDepsFlag   = flag.Bool("nodeps", false, "Omit dependencies packages")
+	depLevelFlag = flag.Int("deplevel", -1, "Load indirect dependencies level")
 	rootFuncFlag = flag.String("rootFunc", "", "Root function in focus package")
 
 	debugFlag   = flag.Bool("debug", false, "Enable verbose log.")
@@ -140,13 +141,11 @@ func main() {
 	}
 
 	args := flag.Args()
-	tests := *testFlag
-	noDeps := *noDepsFlag
 	httpAddr := *httpFlag
 	urlAddr := parseHTTPAddr(httpAddr)
 
 	Analysis = new(analysis)
-	if err := Analysis.DoAnalysis(CallGraphType(*callgraphAlgo), "", tests, noDeps, args); err != nil {
+	if err := Analysis.DoAnalysis(CallGraphType(*callgraphAlgo), "", args); err != nil {
 		log.Fatal(err)
 	}
 

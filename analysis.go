@@ -19,7 +19,6 @@ import (
 	"golang.org/x/tools/go/packages"
 	"golang.org/x/tools/go/pointer"
 	"golang.org/x/tools/go/ssa"
-	"golang.org/x/tools/go/ssa/ssautil"
 )
 
 type CallGraphType string
@@ -64,6 +63,7 @@ func mainPackages(pkgs []*ssa.Package) ([]*ssa.Package, error) {
 // ==[ type def/func: analysis   ]===============================================
 type analysis struct {
 	opts      *renderOpts
+	lopts     *loaderOpts
 	prog      *ssa.Program
 	pkgs      []*ssa.Package
 	mainPkg   *ssa.Package
@@ -75,13 +75,13 @@ var Analysis *analysis
 func (a *analysis) DoAnalysis(
 	algo CallGraphType,
 	dir string,
-	tests bool,
-	noDeps bool,
 	args []string,
 ) error {
+	a.LoaderOptsSetup()
+
 	cfg := &packages.Config{
 		Mode:       packages.LoadAllSyntax,
-		Tests:      tests,
+		Tests:      a.lopts.tests,
 		Dir:        dir,
 		BuildFlags: build.Default.BuildTags,
 	}
@@ -96,14 +96,8 @@ func (a *analysis) DoAnalysis(
 	}
 
 	// Create and build SSA-form program representation.
-	var prog *ssa.Program
-	var pkgs []*ssa.Package
-	if noDeps {
-		// for huge program
-		prog, pkgs = ssautil.Packages(initial, 0)
-	} else {
-		prog, pkgs = ssautil.AllPackages(initial, 0)
-	}
+	// prog, pkgs := ssautil.AllPackages(initial, 0) // 大项目全部 load 出来算法收敛不了...
+	prog, pkgs := LoadPackages(initial, a.lopts)
 
 	prog.Build()
 
@@ -213,6 +207,42 @@ func (a *analysis) ProcessListArgs() (e error) {
 	a.opts.limit = limitPaths
 
 	return
+}
+
+func (a *analysis) LoaderOptsSetup() {
+	var ignorePaths []string
+	var includePaths []string
+	var limitPaths []string
+
+	for _, p := range strings.Split(*ignoreFlag, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			ignorePaths = append(ignorePaths, p)
+		}
+	}
+
+	for _, p := range strings.Split(*includeFlag, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			includePaths = append(includePaths, p)
+		}
+	}
+
+	for _, p := range strings.Split(*limitFlag, ",") {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			limitPaths = append(limitPaths, p)
+		}
+	}
+
+	a.lopts = &loaderOpts{
+		ignore:    ignorePaths,
+		include:   includePaths,
+		limit:     limitPaths,
+		tests:     *testFlag,
+		noDeps:    *noDepsFlag,
+		depsLevel: *depLevelFlag,
+	}
 }
 
 func (a *analysis) OverrideByHTTP(r *http.Request) {
